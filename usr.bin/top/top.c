@@ -907,6 +907,17 @@ restart:
 				}
 				break;
 
+			    case CMD_searchproc: /* new process search */
+				new_message(MT_standout,
+				    "Search processes: ");
+				if (readline(tempbuf1, sizeof(tempbuf1), false) > 0)
+				{
+					/* TODO(jgrafton) copy string from tempbuf1 */
+					ps.command = tempbuf1;
+				}
+				clear_message();
+				break;
+
 			    case CMD_displays:	/* change display count */
 				new_message(MT_standout,
 					"Displays to show (currently %s): ",
