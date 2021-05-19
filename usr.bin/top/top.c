@@ -913,9 +913,10 @@ restart:
 				if (readline(tempbuf1, sizeof(tempbuf1), false) > 0)
 				{
 					/* TODO(jgrafton) copy string from tempbuf1 */
-					ps.command = tempbuf1;
+					//ps.command = tempbuf1;
+                    clear_message();
+					new_message(MT_standout | MT_delayed, "%s", tempbuf1);
 				}
-				clear_message();
 				break;
 
 			    case CMD_displays:	/* change display count */
