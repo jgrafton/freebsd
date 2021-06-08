@@ -907,15 +907,21 @@ restart:
 				}
 				break;
 
-			    case CMD_searchproc: /* new process search */
+			    case CMD_grep: /* grep command name */
 				new_message(MT_standout,
-				    "Search processes: ");
+				    "Grep command name: ");
 				if (readline(tempbuf1, sizeof(tempbuf1), false) > 0)
 				{
-					/* TODO(jgrafton) copy string from tempbuf1 */
-					//ps.command = tempbuf1;
+                    //free(ps.command);
+                    if (tempbuf1[0] == '+' &&
+                        tempbuf1[1] == '\0')
+                        ps.command = NULL;
+                    else if ((ps.command = strdup(tempbuf1)) == NULL)
+                        exit(1); /* TODO this is incorrect behavior, set errno */
+
                     clear_message();
-					new_message(MT_standout | MT_delayed, "%s", tempbuf1);
+					//new_message(MT_standout | MT_delayed, "%s", tempbuf1);
+					putchar('\r');
 				}
 				break;
 
