@@ -807,7 +807,6 @@ get_process_info(struct system_info *si, struct process_select *sel,
 	/* get a pointer to the states summary array */
 	si->procstates = process_states;
 
-
 	/* count up process states and get pointers to interesting procs */
 	total_procs = 0;
 	active_procs = 0;
