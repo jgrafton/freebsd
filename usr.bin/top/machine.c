@@ -838,10 +838,6 @@ get_process_info(struct system_info *si, struct process_select *sel,
 		total_procs++;
 		process_states[(unsigned char)pp->ki_stat]++;
 
-        if (pp->ki_ppid == 1)
-            /* skip processes based with ppid = 1 */
-            continue;
-
 		if (pp->ki_stat == SZOMB)
 			/* skip zombies */
 			continue;
