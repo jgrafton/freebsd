@@ -913,14 +913,11 @@ restart:
 				    "Grep command name: ");
 				if (readline(tempbuf1, sizeof(tempbuf1), false) > 0)
 				{
-					/* TODO has ps.command been allocated beyond struct? */
-					//free(ps.command);
 					if (tempbuf1[0] == '+' &&
 						tempbuf1[1] == '\0')
 						ps.command = NULL;
 					else if ((ps.command = strdup(tempbuf1)) == NULL)
-						/* something went wrong, quit */
-						quit(0);
+						quit(1);
 					clear_message();
 				}
 				break;
