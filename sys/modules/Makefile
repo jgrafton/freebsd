@@ -82,12 +82,10 @@ SUBDIR=	\
 	${_ccp} \
 	cd9660 \
 	cd9660_iconv \
-	${_ce} \
 	${_cfi} \
 	${_chromebook_platform} \
 	${_ciss} \
 	${_coretemp} \
-	${_cp} \
 	${_cpsw} \
 	${_cpuctl} \
 	${_cpufreq} \
@@ -109,6 +107,7 @@ SUBDIR=	\
 	${_efirt} \
 	${_em} \
 	${_ena} \
+	${_enic} \
 	${_enetc} \
 	${_et} \
 	evdev \
@@ -371,6 +370,7 @@ SUBDIR=	\
 	sym \
 	${_syscons} \
 	sysvipc \
+	tarfs \
 	tcp \
 	${_ti} \
 	tmpfs \
@@ -397,6 +397,7 @@ SUBDIR=	\
 	vr \
 	vte \
 	${_wbwd} \
+	${_wdatwd} \
 	wlan \
 	wlan_acl \
 	wlan_amrr \
@@ -708,6 +709,7 @@ _speaker=	speaker
 _splash=	splash
 _syscons=	syscons
 _wbwd=		wbwd
+_wdatwd=	wdatwd
 
 _aac=		aac
 _aacraid=	aacraid
@@ -781,6 +783,7 @@ _x86bios=	x86bios
 .if ${MACHINE_CPUARCH} == "amd64"
 _amdgpio=	amdgpio
 _ccp=		ccp
+_enic=		enic
 _iavf=		iavf
 _ioat=		ioat
 _ixl=		ixl
@@ -811,12 +814,6 @@ _vmm=		vmm
 # XXX some of these can move now, but are untested on other architectures.
 _3dfx=		3dfx
 _3dfx_linux=	3dfx_linux
-.if ${MK_SOURCELESS_HOST} != "no"
-_ce=		ce
-.endif
-.if ${MK_SOURCELESS_HOST} != "no"
-_cp=		cp
-.endif
 _glxiic=	glxiic
 _glxsb=		glxsb
 _pcfclock=	pcfclock

@@ -290,10 +290,10 @@ struct pci_xhci_softc {
 };
 
 
-/* portregs and devices arrays are set up to start from idx=1 */
-#define	XHCI_PORTREG_PTR(x,n)	&(x)->portregs[(n)]
-#define	XHCI_DEVINST_PTR(x,n)	(x)->devices[(n)]
-#define	XHCI_SLOTDEV_PTR(x,n)	(x)->slots[(n)]
+/* port and slot numbering start from 1 */
+#define	XHCI_PORTREG_PTR(x,n)	&((x)->portregs[(n) - 1])
+#define	XHCI_DEVINST_PTR(x,n)	((x)->devices[(n) - 1])
+#define	XHCI_SLOTDEV_PTR(x,n)	((x)->slots[(n) - 1])
 
 #define	XHCI_HALTED(sc)		((sc)->opregs.usbsts & XHCI_STS_HCH)
 
@@ -567,6 +567,10 @@ pci_xhci_portregs_write(struct pci_xhci_softc *sc, uint64_t offset,
 		 * For USB3, this register is reserved.
 		 */
 		p->porthlpmc = value;
+		break;
+	default:
+		DPRINTF(("pci_xhci: unaligned portreg write offset %#lx",
+		    offset));
 		break;
 	}
 }
@@ -2130,13 +2134,15 @@ pci_xhci_rtsregs_write(struct pci_xhci_softc *sc, uint64_t offset,
 static uint64_t
 pci_xhci_portregs_read(struct pci_xhci_softc *sc, uint64_t offset)
 {
+	struct pci_xhci_portregs *portregs;
 	int port;
-	uint32_t *p;
+	uint32_t reg;
 
 	if (sc->portregs == NULL)
 		return (0);
 
-	port = (offset - 0x3F0) / 0x10;
+	port = (offset - XHCI_PORTREGS_PORT0) / XHCI_PORTREGS_SETSZ;
+	offset = (offset - XHCI_PORTREGS_PORT0) % XHCI_PORTREGS_SETSZ;
 
 	if (port > XHCI_MAX_DEVS) {
 		DPRINTF(("pci_xhci: portregs_read port %d >= XHCI_MAX_DEVS",
@@ -2146,15 +2152,31 @@ pci_xhci_portregs_read(struct pci_xhci_softc *sc, uint64_t offset)
 		return (XHCI_PS_SPEED_SET(3));
 	}
 
-	offset = (offset - 0x3F0) % 0x10;
-
-	p = &sc->portregs[port].portsc;
-	p += offset / sizeof(uint32_t);
+	portregs = XHCI_PORTREG_PTR(sc, port);
+	switch (offset) {
+	case 0:
+		reg = portregs->portsc;
+		break;
+	case 4:
+		reg = portregs->portpmsc;
+		break;
+	case 8:
+		reg = portregs->portli;
+		break;
+	case 12:
+		reg = portregs->porthlpmc;
+		break;
+	default:
+		DPRINTF(("pci_xhci: unaligned portregs read offset %#lx",
+		    offset));
+		reg = 0xffffffff;
+		break;
+	}
 
 	DPRINTF(("pci_xhci: portregs read offset 0x%lx port %u -> 0x%x",
-	        offset, port, *p));
+	        offset, port, reg));
 
-	return (*p);
+	return (reg);
 }
 
 static void
@@ -2245,9 +2267,8 @@ pci_xhci_hostop_write(struct pci_xhci_softc *sc, uint64_t offset,
 
 
 static void
-pci_xhci_write(struct vmctx *ctx __unused, int vcpu __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size __unused,
-    uint64_t value)
+pci_xhci_write(struct pci_devinst *pi, int baridx, uint64_t offset,
+    int size __unused, uint64_t value)
 {
 	struct pci_xhci_softc *sc;
 
@@ -2467,8 +2488,7 @@ pci_xhci_xecp_read(struct pci_xhci_softc *sc, uint64_t offset)
 
 
 static uint64_t
-pci_xhci_read(struct vmctx *ctx __unused, int vcpu __unused,
-    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
+pci_xhci_read(struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct pci_xhci_softc *sc;
 	uint32_t	value;
@@ -2716,10 +2736,6 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 	sc->devices = calloc(XHCI_MAX_DEVS, sizeof(struct pci_xhci_dev_emu *));
 	sc->slots = calloc(XHCI_MAX_SLOTS, sizeof(struct pci_xhci_dev_emu *));
 
-	/* port and slot numbering start from 1 */
-	sc->devices--;
-	sc->slots--;
-
 	ndevices = 0;
 
 	slots_nvl = find_relative_config_node(nvl, "slot");
@@ -2813,7 +2829,6 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 
 portsfinal:
 	sc->portregs = calloc(XHCI_MAX_DEVS, sizeof(struct pci_xhci_portregs));
-	sc->portregs--;
 
 	if (ndevices > 0) {
 		for (i = 1; i <= XHCI_MAX_DEVS; i++) {
@@ -2829,14 +2844,14 @@ bad:
 		free(XHCI_DEVINST_PTR(sc, i));
 	}
 
-	free(sc->devices + 1);
-	free(sc->slots + 1);
+	free(sc->devices);
+	free(sc->slots);
 
 	return (-1);
 }
 
 static int
-pci_xhci_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
+pci_xhci_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_xhci_softc *sc;
 	int	error;

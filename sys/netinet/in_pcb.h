@@ -464,13 +464,14 @@ struct inpcbstorage {
 	uma_zone_t	ips_zone;
 	uma_zone_t	ips_portzone;
 	uma_init	ips_pcbinit;
+	size_t		ips_size;
 	const char *	ips_zone_name;
 	const char *	ips_portzone_name;
 	const char *	ips_infolock_name;
 	const char *	ips_hashlock_name;
 };
 
-#define INPCBSTORAGE_DEFINE(prot, lname, zname, iname, hname)		\
+#define INPCBSTORAGE_DEFINE(prot, ppcb, lname, zname, iname, hname)	\
 static int								\
 prot##_inpcb_init(void *mem, int size __unused, int flags __unused)	\
 {									\
@@ -480,6 +481,7 @@ prot##_inpcb_init(void *mem, int size __unused, int flags __unused)	\
 	return (0);							\
 }									\
 static struct inpcbstorage prot = {					\
+	.ips_size = sizeof(struct ppcb),				\
 	.ips_pcbinit = prot##_inpcb_init,				\
 	.ips_zone_name = zname,						\
 	.ips_portzone_name = zname " ports",				\
@@ -624,7 +626,7 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INP_HDRINCL		0x00000008 /* user supplies entire IP header */
 #define	INP_HIGHPORT		0x00000010 /* user wants "high" port binding */
 #define	INP_LOWPORT		0x00000020 /* user wants "low" port binding */
-#define	INP_ANONPORT		0x00000040 /* port chosen for user */
+#define	INP_ANONPORT		0x00000040 /* read by netstat(1) */
 #define	INP_RECVIF		0x00000080 /* receive incoming interface */
 #define	INP_MTUDISC		0x00000100 /* user can do MTU discovery */
 /*	INP_FREED		0x00000200 private to in_pcb.c */
@@ -740,10 +742,10 @@ int	in_pcballoc(struct socket *, struct inpcbinfo *);
 int	in_pcbbind(struct inpcb *, struct sockaddr *, struct ucred *);
 int	in_pcbbind_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
 	    u_short *, struct ucred *);
-int	in_pcbconnect(struct inpcb *, struct sockaddr *, struct ucred *, bool);
-int	in_pcbconnect_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
-	    u_short *, in_addr_t *, u_short *, struct inpcb **,
-	    struct ucred *);
+int	in_pcbconnect(struct inpcb *, struct sockaddr_in *, struct ucred *,
+	    bool);
+int	in_pcbconnect_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
+	    u_short *, in_addr_t *, u_short *, struct ucred *);
 void	in_pcbdetach(struct inpcb *);
 void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);

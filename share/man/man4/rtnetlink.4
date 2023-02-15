@@ -34,7 +34,7 @@
 .In netlink/netlink.h
 .In netlink/netlink_route.h
 .Ft int
-.Fn socket AF_NETLINK SOCK_DGRAM NETLINK_ROUTE
+.Fn socket AF_NETLINK SOCK_RAW NETLINK_ROUTE
 .Sh DESCRIPTION
 The
 .Dv NETLINK_ROUTE
@@ -284,6 +284,13 @@ struct ifinfomsg {
 Creates a new interface.
 The only mandatory TLV is
 .Dv IFLA_IFNAME .
+The following attributes are returned inside the nested
+.Dv NLMSGERR_ATTR_COOKIE :
+.Pp
+.Bd -literal -offset indent -compact
+IFLA_NEW_IFINDEX	(uint32) created interface index
+IFLA_IFNAME		(string) created interface name
+.Ed
 .Ss RTM_DELLINK
 Deletes the interface specified by
 .Dv IFLA_IFNAME .
@@ -309,6 +316,8 @@ IFLA_ALT_IFNAME	interface name
 (binary) (readonly) Link-level broadcast address.
 .It Dv IFLA_IFNAME
 (string) New interface name.
+.It Dv IFLA_IFALIAS
+(string) Interface description.
 .It Dv IFLA_LINK
 (uint32_t) (readonly) Interface index.
 .It Dv IFLA_MASTER
@@ -401,14 +410,27 @@ Not supported
 .Ss RTM_DELADDR
 Not supported
 .Ss RTM_GETADDR
+Fetches interface addresses in the current VNET matching conditions.
+Each address is reported as a
+.Dv RTM_NEWADDR
+message.
+The following filters are recognised by the kernel:
+.Pp
+.Bd -literal -offset indent -compact
+ifa_family	required family or AF_UNSPEC
+ifa_index	matching interface index or 0
+.Ed
 .Ss TLVs
 .Bl -tag -width indent
 .It Dv IFA_ADDRESS
 (binary) masked interface address or destination address for p2p interfaces.
 .It Dv IFA_LOCAL
-(binary) local interface address
+(binary) local interface address.
+Set for IPv4 and p2p addresses.
+.It Dv IFA_LABEL
+(string) interface name.
 .It Dv IFA_BROADCAST
-(binary) broacast interface address
+(binary) broacast interface address.
 .El
 .Ss Groups
 The following groups are defined:

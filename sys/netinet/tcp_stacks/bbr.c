@@ -36,7 +36,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
-#include "opt_tcpdebug.h"
 #include "opt_ratelimit.h"
 #include <sys/param.h>
 #include <sys/arb.h>
@@ -99,9 +98,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_log_buf.h>
 #include <netinet/tcp_ratelimit.h>
 #include <netinet/tcp_lro.h>
-#ifdef TCPDEBUG
-#include <netinet/tcp_debug.h>
-#endif				/* TCPDEBUG */
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
@@ -5285,37 +5281,13 @@ bbr_timer_cancel(struct tcp_bbr *bbr, int32_t line, uint32_t cts)
 	}
 }
 
-static void
-bbr_timer_stop(struct tcpcb *tp, uint32_t timer_type)
+static int
+bbr_stopall(struct tcpcb *tp)
 {
 	struct tcp_bbr *bbr;
 
 	bbr = (struct tcp_bbr *)tp->t_fb_ptr;
 	bbr->rc_all_timers_stopped = 1;
-	return;
-}
-
-/*
- * stop all timers always returning 0.
- */
-static int
-bbr_stopall(struct tcpcb *tp)
-{
-	return (0);
-}
-
-static void
-bbr_timer_activate(struct tcpcb *tp, uint32_t timer_type, uint32_t delta)
-{
-	return;
-}
-
-/*
- * return true if a bbr timer (rack or tlp) is active.
- */
-static int
-bbr_timer_active(struct tcpcb *tp, uint32_t timer_type)
-{
 	return (0);
 }
 
@@ -6384,8 +6356,6 @@ tcp_bbr_xmit_timer_commit(struct tcp_bbr *bbr, struct tcpcb *tp, uint32_t cts)
 		tp->t_rttvar += delta;
 		if (tp->t_rttvar <= 0)
 			tp->t_rttvar = 1;
-		if (tp->t_rttbest > tp->t_srtt + tp->t_rttvar)
-			tp->t_rttbest = tp->t_srtt + tp->t_rttvar;
 	} else {
 		/*
 		 * No rtt measurement yet - use the unsmoothed rtt. Set the
@@ -6394,10 +6364,10 @@ tcp_bbr_xmit_timer_commit(struct tcp_bbr *bbr, struct tcpcb *tp, uint32_t cts)
 		 */
 		tp->t_srtt = rtt_ticks << TCP_RTT_SHIFT;
 		tp->t_rttvar = rtt_ticks << (TCP_RTTVAR_SHIFT - 1);
-		tp->t_rttbest = tp->t_srtt + tp->t_rttvar;
 	}
 	KMOD_TCPSTAT_INC(tcps_rttupdated);
-	tp->t_rttupdated++;
+	if (tp->t_rttupdated < UCHAR_MAX)
+		tp->t_rttupdated++;
 #ifdef STATS
 	stats_voi_update_abs_u32(tp->t_stats, VOI_TCP_RTT, imax(0, rtt_ticks));
 #endif
@@ -6955,7 +6925,7 @@ bbr_log_sack_passed(struct tcpcb *tp,
 	TAILQ_FOREACH_REVERSE_FROM(nrsm, &bbr->r_ctl.rc_tmap,
 	    bbr_head, r_tnext) {
 		if (nrsm == rsm) {
-			/* Skip orginal segment he is acked */
+			/* Skip original segment he is acked */
 			continue;
 		}
 		if (nrsm->r_flags & BBR_ACKED) {
@@ -8436,16 +8406,7 @@ bbr_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 #ifdef NETFLIX_SB_LIMITS
 	u_int mcnt, appended;
 #endif
-#ifdef TCPDEBUG
-	/*
-	 * The size of tcp_saveipgen must be the size of the max ip header,
-	 * now IPv6.
-	 */
-	u_char tcp_saveipgen[IP6_HDR_LEN];
-	struct tcphdr tcp_savetcp;
-	short ostate = 0;
 
-#endif
 	/* On the hpts and we would have called output */
 	bbr = (struct tcp_bbr *)tp->t_fb_ptr;
 
@@ -8520,11 +8481,6 @@ bbr_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	tp->rcv_up = tp->rcv_nxt;
 	KMOD_TCPSTAT_ADD(tcps_rcvpack, (int)nsegs);
 	KMOD_TCPSTAT_ADD(tcps_rcvbyte, tlen);
-#ifdef TCPDEBUG
-	if (so->so_options & SO_DEBUG)
-		tcp_trace(TA_INPUT, ostate, tp,
-		    (void *)tcp_saveipgen, &tcp_savetcp, 0);
-#endif
 	newsize = tcp_autorcvbuf(m, th, so, tp, tlen);
 
 	/* Add data to socket buffer. */
@@ -8582,16 +8538,6 @@ bbr_fastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	int32_t acked;
 	uint16_t nsegs;
 	uint32_t sack_changed;
-#ifdef TCPDEBUG
-	/*
-	 * The size of tcp_saveipgen must be the size of the max ip header,
-	 * now IPv6.
-	 */
-	u_char tcp_saveipgen[IP6_HDR_LEN];
-	struct tcphdr tcp_savetcp;
-	short ostate = 0;
-
-#endif
 	uint32_t prev_acked = 0;
 	struct tcp_bbr *bbr;
 
@@ -8731,14 +8677,8 @@ bbr_fastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * value. If process is waiting for space, wakeup/selwakeup/signal.
 	 * If data are ready to send, let tcp_output decide between more
 	 * output or persist.
+	 * Wake up the socket if we have room to write more.
 	 */
-#ifdef TCPDEBUG
-	if (so->so_options & SO_DEBUG)
-		tcp_trace(TA_INPUT, ostate, tp,
-		    (void *)tcp_saveipgen,
-		    &tcp_savetcp, 0);
-#endif
-	/* Wake up the socket if we have room to write more */
 	sowwakeup(so);
 	if (tp->snd_una == tp->snd_max) {
 		/* Nothing left outstanding */
@@ -9922,10 +9862,6 @@ bbr_stop_all_timers(struct tcpcb *tp)
 		bbr = (struct tcp_bbr *)tp->t_fb_ptr;
 		bbr->rc_in_persist = 1;
 	}
-	tcp_timer_suspend(tp, TT_PERSIST);
-	tcp_timer_suspend(tp, TT_REXMT);
-	tcp_timer_suspend(tp, TT_KEEP);
-	tcp_timer_suspend(tp, TT_DELACK);
 }
 
 static void
@@ -11878,9 +11814,6 @@ bbr_output_wtime(struct tcpcb *tp, const struct timeval *tv)
 	uint32_t if_hw_tsomaxsegsize = 0;
 	uint32_t if_hw_tsomax = 0;
 	struct ip *ip = NULL;
-#ifdef TCPDEBUG
-	struct ipovly *ipov = NULL;
-#endif
 	struct tcp_bbr *bbr;
 	struct tcphdr *th;
 	struct udphdr *udp = NULL;
@@ -11928,7 +11861,7 @@ bbr_output_wtime(struct tcpcb *tp, const struct timeval *tv)
 	inp = bbr->rc_inp;
 	so = inp->inp_socket;
 	sb = &so->so_snd;
- 	if (sb->sb_flags & SB_TLS_IFNET)
+	if (tp->t_nic_ktls_xmit)
  		hw_tls = 1;
  	else
  		hw_tls = 0;
@@ -13329,9 +13262,6 @@ send:
 #endif				/* INET6 */
 	{
 		ip = mtod(m, struct ip *);
-#ifdef TCPDEBUG
-		ipov = (struct ipovly *)ip;
-#endif
 		if (tp->t_port) {
 			udp = (struct udphdr *)((caddr_t)ip + sizeof(struct ip));
 			udp->uh_sport = htons(V_tcp_udp_tunneling_port);
@@ -13542,28 +13472,6 @@ send:
 	/* Run HHOOK_TC_ESTABLISHED_OUT helper hooks. */
 	hhook_run_tcp_est_out(tp, th, &to, len, tso);
 #endif
-#ifdef TCPDEBUG
-	/*
-	 * Trace.
-	 */
-	if (so->so_options & SO_DEBUG) {
-		u_short save = 0;
-
-#ifdef INET6
-		if (!isipv6)
-#endif
-		{
-			save = ipov->ih_len;
-			ipov->ih_len = htons(m->m_pkthdr.len	/* - hdrlen +
-			      * (th->th_off << 2) */ );
-		}
-		tcp_trace(TA_OUTPUT, tp->t_state, tp, mtod(m, void *), th, 0);
-#ifdef INET6
-		if (!isipv6)
-#endif
-			ipov->ih_len = save;
-	}
-#endif				/* TCPDEBUG */
 
 	/* Log to the black box */
 	if (tp->t_logstate != TCP_LOG_STATE_OFF) {
@@ -14175,9 +14083,6 @@ struct tcp_function_block __tcp_bbr = {
 	.tfb_tcp_fb_init = bbr_init,
 	.tfb_tcp_fb_fini = bbr_fini,
 	.tfb_tcp_timer_stop_all = bbr_stopall,
-	.tfb_tcp_timer_activate = bbr_timer_activate,
-	.tfb_tcp_timer_active = bbr_timer_active,
-	.tfb_tcp_timer_stop = bbr_timer_stop,
 	.tfb_tcp_rexmit_tmr = bbr_remxt_tmr,
 	.tfb_tcp_handoff_ok = bbr_handoff_ok,
 	.tfb_tcp_mtu_chg = bbr_mtu_chg,

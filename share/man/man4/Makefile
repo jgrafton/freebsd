@@ -143,6 +143,7 @@ MAN=	aac.4 \
 	em.4 \
 	ena.4 \
 	enc.4 \
+	enic.4 \
 	epair.4 \
 	est.4 \
 	et.4 \
@@ -271,6 +272,7 @@ MAN=	aac.4 \
 	ktls.4 \
 	ktr.4 \
 	kue.4 \
+	${_kvmclock.4} \
 	lagg.4 \
 	le.4 \
 	led.4 \
@@ -588,6 +590,7 @@ MAN=	aac.4 \
 	vtnet.4 \
 	watchdog.4 \
 	${_wbwd.4} \
+	${_wdatwd.4} \
 	wg.4 \
 	witness.4 \
 	wlan.4 \
@@ -823,6 +826,7 @@ _igc.4=		igc.4
 _imcsmb.4=	imcsmb.4
 _io.4=		io.4
 _itwd.4=	itwd.4
+_kvmclock.4=	kvmclock.4
 _mgb.4=		mgb.4
 _nda.4=		nda.4
 _nfe.4=		nfe.4
@@ -850,6 +854,7 @@ _vmci.4=	vmci.4
 _vmd.4=		vmd.4
 _vmx.4=		vmx.4
 _wbwd.4=	wbwd.4
+_wdatwd.4=	wdatwd.4
 _wpi.4=		wpi.4
 _xen.4=		xen.4
 _xnb.4=		xnb.4

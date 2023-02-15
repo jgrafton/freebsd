@@ -30,10 +30,6 @@ dev/agp/agp_intel.c		optional agp
 dev/agp/agp_nvidia.c		optional agp
 dev/agp/agp_sis.c		optional agp
 dev/agp/agp_via.c		optional agp
-dev/ce/ceddk.c			optional ce
-dev/ce/if_ce.c			optional ce
-dev/ce/tau32-ddk.c		optional ce \
-	compile-with "${NORMAL_C} ${NO_WCONSTANT_CONVERSION} ${NO_WMISLEADING_INDENTATION} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/glxiic/glxiic.c		optional glxiic
 dev/glxsb/glxsb.c		optional glxsb
 dev/glxsb/glxsb_hash.c		optional glxsb
@@ -69,6 +65,7 @@ dev/viawd/viawd.c		optional viawd
 dev/vmd/vmd.c			optional vmd
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/wbwd/wbwd.c			optional wbwd
+dev/wdatwd/wdatwd.c		optional wdatwd
 i386/acpica/acpi_machdep.c	optional acpi
 i386/acpica/acpi_wakeup.c	optional acpi
 acpi_wakecode.o			optional acpi				\
