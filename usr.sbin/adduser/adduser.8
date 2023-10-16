@@ -32,7 +32,7 @@
 .Nd command for adding new users
 .Sh SYNOPSIS
 .Nm
-.Op Fl CDENShq
+.Op Fl CDENSZhq
 .Op Fl G Ar groups
 .Op Fl L Ar login_class
 .Op Fl M Ar mode
@@ -44,6 +44,7 @@
 .Op Fl s Ar shell
 .Op Fl u Ar uid_start
 .Op Fl w Ar type
+.Op Fl z Ar dataset
 .Sh DESCRIPTION
 The
 .Nm
@@ -52,6 +53,8 @@ utility is a shell script, implemented around the
 command, for adding new users.
 It creates passwd/group entries, a home directory,
 copies dotfiles and sends the new user a welcome message.
+It also supports creating a ZFS dataset for the user's
+home directory if supported.
 It supports two modes of operation.
 It may be used interactively
 at the command line to add one user at a time, or it may be directed
@@ -295,6 +298,19 @@ In addition, it will be available for inclusion in the message file in the
 .Va randompass
 variable.
 .El
+.It Fl z Ar dataset
+Create home directory on ZFS 
+.Ar dataset .
+.It Fl Z
+Set ZFS creation flag to yes.  The
+.Nm
+utility will attempt to detect if
+ZFS is supported but will still ask if you'd like to create a ZFS
+dataset for the home directory.  Setting this flag turns off the 
+question and assumes yes.  Use in conjunction with the 
+.Fl f
+option to
+create ZFS datasets in batch mode.
 .El
 .Sh FORMAT
 When the

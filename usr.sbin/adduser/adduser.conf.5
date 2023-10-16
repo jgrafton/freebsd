@@ -171,6 +171,14 @@ The default information to be held in the GECOS field of
 .It Va uidstart
 The default user ID setting.
 This must be a number above 1000 and fewer than 65534.
+.It Va Zflag
+Turn on ZFS support by default.
+.It Va zfsopt
+Options passed into the 
+.Xr zfs-create 8
+command during creation
+of home dataset.  Can be used to enable compression, encryption,
+turn off atime, or any option supported by ZFS.
 .El
 .Sh EXAMPLES
 The following is an example

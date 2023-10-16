@@ -84,6 +84,7 @@ show_usage() {
 	echo "  -L		login class of the user"
 	echo "  -M		file permission for home directory"
 	echo "  -N		do not read configuration file"
+	echo "  -Z		attempt to create ZFS home dataset"
 	echo "  -S		a nonexistent shell is not an error"
 	echo "  -d		home directory"
 	echo "  -f		file from which input will be received"
@@ -95,6 +96,7 @@ show_usage() {
 	echo "  -s		shell"
 	echo "  -u		uid to start at"
 	echo "  -w		password type: no, none, yes or random"
+	echo "  -z		zfs home dataset location"
 }
 
 # valid_shells
@@ -197,11 +199,14 @@ save_config() {
 	echo "defaultgroups=$ugroups"	>> ${ADDUSERCONF}
 	echo "passwdtype=$passwdtype" 	>> ${ADDUSERCONF}
 	echo "homeprefix=$homeprefix" 	>> ${ADDUSERCONF}
+	echo "zfs_homeprefix=$zfs_homeprefix" 	>> ${ADDUSERCONF}
 	echo "defaultshell=$ushell"	>> ${ADDUSERCONF}
 	echo "udotdir=$udotdir"		>> ${ADDUSERCONF}
 	echo "msgfile=$msgfile"		>> ${ADDUSERCONF}
 	echo "disableflag=$disableflag" >> ${ADDUSERCONF}
 	echo "uidstart=$uidstart"       >> ${ADDUSERCONF}
+	echo "Zflag=$Zflag"       >> ${ADDUSERCONF}
+	echo "zfsopt=\"$zfsopt\""       >> ${ADDUSERCONF}
 }
 
 # add_user
@@ -283,6 +288,11 @@ add_user() {
 		;;
 	esac
 
+	# create ZFS dataset if Zflag is set before home directory is created with pw
+	if [ -n "$Zflag" ]; then
+		create_zfs_dataset
+	fi
+
 	_pwcmd="$_upasswd ${PWCMD} useradd $_uid $_name $_group $_grouplist $_comment"
 	_pwcmd="$_pwcmd $_shell $_class $_home $_dotdir $_passwdmethod $_passwd"
 	_pwcmd="$_pwcmd $_expire $_pwexpire"
@@ -304,6 +314,11 @@ add_user() {
 		else
 			info "Account ($username) could NOT be locked."
 		fi
+	fi
+
+	# give newly created user permissions to their home zfs dataset
+	if [ -n "$Zflag" ]; then
+		set_zfs_perms
 	fi
 
 	_line=
@@ -479,6 +494,43 @@ get_homeperm() {
 	fi
 }
 
+# get_zfs_opt
+#	Read ZFS options for the user's home dataset.
+#
+get_zfs_opt() {
+	_input=
+	if [ -z "$fflag" ]; then
+		echo -n "Home ZFS options [${zfsopt}]: "
+		read _input
+	fi
+
+	if [ -n "$_input" ]; then
+		zfsopt="$_input"
+		Zflag=yes
+	else
+		zfsopt="${zfsopt}"
+	fi
+}
+
+# get_zfs_dataset
+#	Reads the account's ZFS dataset.
+#
+get_zfs_dataset() {
+	_input=
+	if [ -z "$fflag" ]; then
+		echo -n "Home ZFS dataset [${zfs_homeprefix}/${username}]: "
+		read _input
+	fi
+
+	# set zhome to the default if the user did not specify one
+	if [ -n "$_input" ]; then
+		zhome="$_input"
+		Zflag=yes
+	else
+		zhome="${zfs_homeprefix}/${username}"
+	fi
+}
+
 # get_uid
 #	Reads a numeric userid in an interactive or batch session. Automatically
 #	allocates one if it is not specified.
@@ -613,6 +665,47 @@ get_password() {
 	fi
 }
 
+# get_zfs_support
+#	Determine if ZFS is supported on this system.
+#
+get_zfs_support()
+{
+	_zfs_list=`${ZFSCMD} list 2>&1`
+	if [ "$?" -ne 0 ]; then
+		zsupported=
+	elif [ "$_zfs_list" = "no datasets available" ]; then
+		zsupported=
+	else
+		zsupported="yes"
+	fi
+}
+
+# create_zfs_dataset
+#   Create ZFS dataset owned by the user that was just added.
+#
+create_zfs_dataset() {
+	${ZFSCMD} create -p -o "mountpoint=${uhome}" ${zfsopt} "${zhome}"
+	if [ "$?" -ne 0 ]; then
+		err "There was an error creating ZFS dataset (${zhome})."
+		return 1
+	else
+		info "Successfully created ZFS dataset (${zhome})."
+	fi
+}
+
+# set_zfs_perms
+#   Give new user ownership of newly created zfs dataset.
+#
+set_zfs_perms() {
+	${ZFSCMD} allow "${username}" create,destroy,mount,snapshot "${zhome}"
+	if [ "$?" -ne 0 ]; then
+		err "There was an error setting permissions on ZFS dataset (${zhome})."
+		return 1
+	else
+		info "Successfully set permissions on ZFS dataset (${zhome})."
+	fi
+}
+
 # input_from_file
 #	Reads a line of account information from standard input and
 #	adds it to the user database.
@@ -632,6 +725,8 @@ input_from_file() {
 			get_class
 			get_shell
 			get_homedir
+			get_zfs_dataset
+			get_zfs_opt
 			get_homeperm
 			get_password
 			get_expire_dates
@@ -704,6 +799,33 @@ input_interactive() {
 	get_shell
 	get_homedir
 	get_homeperm
+
+	get_zfs_support
+	_create_zfs=${Zflag:-"no"}
+	if [ -n "$zsupported" ]; then
+		if [ -z "$Zflag" ]; then
+			while : ; do
+				echo -n "Create ZFS dataset for user home directory? [$_create_zfs]: "
+				read _input
+				[ -z "$_input" ] && _input=$_create_zfs
+				case $_input in
+				[Nn][Oo]|[Nn])
+					Zflag=
+					;;
+				[Yy][Ee][Ss]|[Yy][Ee]|[Yy])
+					Zflag=yes
+					;;
+				*)
+					# invalid answer; repeat loop
+					continue
+					;;
+				esac
+				break
+			done
+		fi
+	fi
+	[ -n "$Zflag" -a -z "${zhome}" ] && get_zfs_dataset
+	[ -n "$Zflag" ] && get_zfs_opt
 
 	while : ; do
 		echo -n "Use password-based authentication? [$_usepass]: "
@@ -787,12 +909,12 @@ input_interactive() {
 		esac
 		break
 	done
-	
+
 	# Display the information we have so far and prompt to
 	# commit it.
 	#
 	_disable=${disableflag:-"no"}
-	[ -z "$configflag" ] && printf "%-10s : %s\n" Username $username
+	[ -z "$configflag" ] && printf "%-11s : %s\n" Username $username
 	case $passwdtype in
 	yes)
 		_pass='*****'
@@ -807,16 +929,20 @@ input_interactive() {
 		_pass='<random>'
 		;;
 	esac
-	[ -z "$configflag" ] && printf "%-10s : %s\n" "Password" "$_pass"
-	[ -n "$configflag" ] && printf "%-10s : %s\n" "Pass Type" "$passwdtype"
-	[ -z "$configflag" ] && printf "%-10s : %s\n" "Full Name" "$ugecos"
-	[ -z "$configflag" ] && printf "%-10s : %s\n" "Uid" "$uuid"
-	printf "%-10s : %s\n" "Class" "$uclass"
-	printf "%-10s : %s %s\n" "Groups" "${ulogingroup:-$username}" "$ugroups"
-	printf "%-10s : %s\n" "Home" "$uhome"
-	printf "%-10s : %s\n" "Home Mode" "$uhomeperm"
-	printf "%-10s : %s\n" "Shell" "$ushell"
-	printf "%-10s : %s\n" "Locked" "$_disable"
+	[ -z "$configflag" ] && printf "%-11s : %s\n" "Password" "$_pass"
+	[ -n "$configflag" ] && printf "%-11s : %s\n" "Pass Type" "$passwdtype"
+	[ -z "$configflag" ] && printf "%-11s : %s\n" "Full Name" "$ugecos"
+	[ -z "$configflag" ] && printf "%-11s : %s\n" "Uid" "$uuid"
+	if [ -n "$Zflag" ]; then
+		[ -z "$configflag" ] && printf "%-11s : %s\n" "ZFS dataset" "${zhome}"
+		[ -z "$configflag" ] && printf "%-11s : %s\n" "ZFS options" "${zfsopt}"
+	fi
+	printf "%-11s : %s\n" "Class" "$uclass"
+	printf "%-11s : %s %s\n" "Groups" "${ulogingroup:-$username}" "$ugroups"
+	printf "%-11s : %s\n" "Home" "$uhome"
+	printf "%-11s : %s\n" "Home Mode" "$uhomeperm"
+	printf "%-11s : %s\n" "Shell" "$ushell"
+	printf "%-11s : %s\n" "Locked" "$_disable"
 	while : ; do
 		echo -n "OK? (yes/no) [$_all_ok]: "
 		read _input
@@ -852,6 +978,7 @@ NOLOGIN="nologin"
 NOLOGIN_PATH="/usr/sbin/nologin"
 GREPCMD="/usr/bin/grep"
 DATECMD="/bin/date"
+ZFSCMD="/sbin/zfs"
 
 # Set default values
 #
@@ -880,8 +1007,11 @@ infile=
 disableflag=
 Dflag=
 Sflag=
+Zflag=
+zsupported=
 readconfig="yes"
 homeprefix="/home"
+zfs_homeprefix="zroot/home"
 randompass=
 fileline=
 savedpwtype=
@@ -890,6 +1020,7 @@ defaultLgroup=
 defaultgroups=
 defaultshell="${DEFAULTSHELL}"
 defaultHomePerm=
+zfsopt="-o compression=off -o atime=on"
 
 # Make sure the user running this program is root. This isn't a security
 # measure as much as it is a useful method of reminding the user to
@@ -1012,6 +1143,15 @@ for _switch ; do
 		;;
 	-u)
 		uidstart=$2
+		shift; shift
+		;;
+	-Z)
+		Zflag=yes
+		shift
+		;;
+	-z)
+		zhome=$2
+		Zflag=yes
 		shift; shift
 		;;
 	esac
