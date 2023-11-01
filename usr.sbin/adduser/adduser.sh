@@ -84,7 +84,7 @@ show_usage() {
 	echo "  -L		login class of the user"
 	echo "  -M		file permission for home directory"
 	echo "  -N		do not read configuration file"
-	echo "  -Z		attempt to create ZFS home dataset"
+	echo "  -Z		do not attempt to create ZFS home dataset"
 	echo "  -S		a nonexistent shell is not an error"
 	echo "  -d		home directory"
 	echo "  -f		file from which input will be received"
@@ -96,7 +96,6 @@ show_usage() {
 	echo "  -s		shell"
 	echo "  -u		uid to start at"
 	echo "  -w		password type: no, none, yes or random"
-	echo "  -z		zfs home dataset location"
 }
 
 # valid_shells
@@ -206,7 +205,7 @@ save_config() {
 	echo "disableflag=$disableflag" >> ${ADDUSERCONF}
 	echo "uidstart=$uidstart"       >> ${ADDUSERCONF}
 	echo "Zflag=$Zflag"       >> ${ADDUSERCONF}
-	echo "zfsopt=\"$zfsopt\""       >> ${ADDUSERCONF}
+	echo "Zencrypt=$Zencrypt"       >> ${ADDUSERCONF}
 }
 
 # add_user
@@ -288,9 +287,13 @@ add_user() {
 		;;
 	esac
 
-	# create ZFS dataset if Zflag is set before home directory is created with pw
-	if [ -n "$Zflag" ]; then
+	# create ZFS dataset if Zflag is not set before home directory is created with pw
+	if [ -z "$Zflag" ]; then
 		create_zfs_dataset
+		if [ "$?" -ne 0 ]; then
+			err "There was an error adding user ($username)."
+			return 1
+		fi
 	fi
 
 	_pwcmd="$_upasswd ${PWCMD} useradd $_uid $_name $_group $_grouplist $_comment"
@@ -317,7 +320,7 @@ add_user() {
 	fi
 
 	# give newly created user permissions to their home zfs dataset
-	if [ -n "$Zflag" ]; then
+	if [ -z "$Zflag" ]; then
 		set_zfs_perms
 	fi
 
@@ -494,40 +497,34 @@ get_homeperm() {
 	fi
 }
 
-# get_zfs_opt
+# get_zfs_encryption
 #	Read ZFS options for the user's home dataset.
 #
-get_zfs_opt() {
+get_zfs_encryption() {
 	_input=
-	if [ -z "$fflag" ]; then
-		echo -n "Home ZFS options [${zfsopt}]: "
+	Zencrypt=${Zencrypt:-"no"}
+	while : ; do
+		echo -n "Encrypt ZFS home dataset? [${Zencrypt}]: "
 		read _input
-	fi
 
-	if [ -n "$_input" ]; then
-		zfsopt="$_input"
-		Zflag=yes
-	else
-		zfsopt="${zfsopt}"
-	fi
-}
+		[ -z "$_input" ] && _input=$Zencrypt
+		case $_input in
+		[Nn][Oo]|[Nn])
+			Zencrypt=
+			;;
+		[Yy][Ee][Ss]|[Yy][Ee]|[Yy])
+			Zencrypt=yes
+			;;
+		*)
+			# invalid answer; repeat loop
+			continue
+			;;
+		esac
+		break
+	done
 
-# get_zfs_dataset
-#	Reads the account's ZFS dataset.
-#
-get_zfs_dataset() {
-	_input=
-	if [ -z "$fflag" ]; then
-		echo -n "Home ZFS dataset [${zfs_homeprefix}/${username}]: "
-		read _input
-	fi
-
-	# set zhome to the default if the user did not specify one
-	if [ -n "$_input" ]; then
-		zhome="$_input"
-		Zflag=yes
-	else
-		zhome="${zfs_homeprefix}/${username}"
+	if [ -n "${Zencrypt}" ]; then
+		zfsopt="-o encryption=on -o keylocation=prompt -o keyformat=passphrase"
 	fi
 }
 
@@ -665,26 +662,29 @@ get_password() {
 	fi
 }
 
-# get_zfs_support
-#	Determine if ZFS is supported on this system.
+# get_zfs_home
+#	Determine if homeprefix is located on a ZFS filesystem and if
+#	so, enable ZFS home dataset creation.
 #
-get_zfs_support()
+get_zfs_home()
 {
-	_zfs_list=`${ZFSCMD} list 2>&1`
+	zfs_homeprefix=`${ZFSCMD} list -Ho name "${homeprefix}" 2>/dev/null`
 	if [ "$?" -ne 0 ]; then
-		zsupported=
-	elif [ "$_zfs_list" = "no datasets available" ]; then
-		zsupported=
-	else
-		zsupported="yes"
+		Zflag=yes
+	elif [ -z "${zfs_homeprefix}" ]; then
+		Zflag=yes
 	fi
+	zhome="${zfs_homeprefix}/${username}"
 }
 
 # create_zfs_dataset
 #   Create ZFS dataset owned by the user that was just added.
 #
 create_zfs_dataset() {
-	${ZFSCMD} create -p -o "mountpoint=${uhome}" ${zfsopt} "${zhome}"
+	if [ -n "${Zencrypt}" ]; then
+		echo "Encryption passphrase for dataset (must be at least 8 characters)"
+	fi
+	${ZFSCMD} create ${zfsopt} "${zhome}"
 	if [ "$?" -ne 0 ]; then
 		err "There was an error creating ZFS dataset (${zhome})."
 		return 1
@@ -725,8 +725,8 @@ input_from_file() {
 			get_class
 			get_shell
 			get_homedir
-			get_zfs_dataset
-			get_zfs_opt
+			get_zfs_home
+			get_zfs_encryption
 			get_homeperm
 			get_password
 			get_expire_dates
@@ -800,32 +800,8 @@ input_interactive() {
 	get_homedir
 	get_homeperm
 
-	get_zfs_support
-	_create_zfs=${Zflag:-"no"}
-	if [ -n "$zsupported" ]; then
-		if [ -z "$Zflag" ]; then
-			while : ; do
-				echo -n "Create ZFS dataset for user home directory? [$_create_zfs]: "
-				read _input
-				[ -z "$_input" ] && _input=$_create_zfs
-				case $_input in
-				[Nn][Oo]|[Nn])
-					Zflag=
-					;;
-				[Yy][Ee][Ss]|[Yy][Ee]|[Yy])
-					Zflag=yes
-					;;
-				*)
-					# invalid answer; repeat loop
-					continue
-					;;
-				esac
-				break
-			done
-		fi
-	fi
-	[ -n "$Zflag" -a -z "${zhome}" ] && get_zfs_dataset
-	[ -n "$Zflag" ] && get_zfs_opt
+	get_zfs_home
+	[ -z "$Zflag" ] && get_zfs_encryption
 
 	while : ; do
 		echo -n "Use password-based authentication? [$_usepass]: "
@@ -933,10 +909,8 @@ input_interactive() {
 	[ -n "$configflag" ] && printf "%-11s : %s\n" "Pass Type" "$passwdtype"
 	[ -z "$configflag" ] && printf "%-11s : %s\n" "Full Name" "$ugecos"
 	[ -z "$configflag" ] && printf "%-11s : %s\n" "Uid" "$uuid"
-	if [ -n "$Zflag" ]; then
-		[ -z "$configflag" ] && printf "%-11s : %s\n" "ZFS dataset" "${zhome}"
-		[ -z "$configflag" ] && printf "%-11s : %s\n" "ZFS options" "${zfsopt}"
-	fi
+	[ -z "$Zflag" -a -z "$configflag" ] && printf "%-11s : %s\n" "ZFS dataset" "${zhome}"
+	[ -z "$Zflag" -a -z "$configflag" ] && printf "%-11s : %s\n" "Encrypted" "${Zencrypt}"
 	printf "%-11s : %s\n" "Class" "$uclass"
 	printf "%-11s : %s %s\n" "Groups" "${ulogingroup:-$username}" "$ugroups"
 	printf "%-11s : %s\n" "Home" "$uhome"
@@ -1011,7 +985,7 @@ Zflag=
 zsupported=
 readconfig="yes"
 homeprefix="/home"
-zfs_homeprefix="zroot/home"
+zfs_homeprefix=
 randompass=
 fileline=
 savedpwtype=
@@ -1020,7 +994,8 @@ defaultLgroup=
 defaultgroups=
 defaultshell="${DEFAULTSHELL}"
 defaultHomePerm=
-zfsopt="-o compression=off -o atime=on"
+zfsopt=
+Zencrypt=
 
 # Make sure the user running this program is root. This isn't a security
 # measure as much as it is a useful method of reminding the user to
@@ -1148,11 +1123,6 @@ for _switch ; do
 	-Z)
 		Zflag=yes
 		shift
-		;;
-	-z)
-		zhome=$2
-		Zflag=yes
-		shift; shift
 		;;
 	esac
 done
