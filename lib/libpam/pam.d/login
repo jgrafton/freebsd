@@ -4,6 +4,7 @@
 #
 
 # auth
+#auth		optional	pam_zfs_key.so		homes=zroot/home
 auth		sufficient	pam_self.so		no_warn
 auth		include		system
 
@@ -13,6 +14,7 @@ account		required	pam_nologin.so
 account		include		system
 
 # session
+#session		optional	pam_zfs_key.so		homes=zroot/home
 session		include		system
 
 # password

@@ -27,7 +27,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 1, 2024
+.Dd December 6, 2024
 .Dt ADDUSER 8
 .Os
 .Sh NAME
@@ -144,6 +144,29 @@ area.
 I have been using this model for almost 10 years and found that it works
 for most situations, and has never gotten in the way.
 (Rod Grimes)
+.Sh ZFS ENCRYPTION
+If ZFS encryption is enabled on the users home dataset,
+.Xr zfs-load-key 8
+must be run against it before mounting.
+It can either be run manually after login or setup to run at
+login with the pam_zfs_key.so
+.Xr openpam 3
+module.
+.sp
+To configure
+.Xr zfs-load-key 8
+to run at login,
+uncomment lines that mention pam_zfs_key.so in the /etc/pam.d/login and
+/etc/pam.d/passwd files.
+Note that changing the user password with
+.Xr passwd 1
+does not update the zfs encryption key.
+Use
+.Xr zfs-change-key 8
+to set the encryption key.
+For auto mounting an encrypted dataset at login to work with pam_zfs_key.so,
+the encryption key and user password must be identical.
+Logins via SSH will not auto mount the encrypted dataset.
 .Sh CONFIGURATION
 The
 .Nm
