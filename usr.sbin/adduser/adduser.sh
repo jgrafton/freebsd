@@ -635,7 +635,7 @@ get_password() {
 #
 get_zfs_encryption() {
 	local _input= _prompt=
-	_prompt="Enable ZFS encryption? (yes/no) [${Zencrypt}]: "
+	_prompt="Enable ZFS encryption? (requires pam.d changes, see adduser(8)) (yes/no) [${Zencrypt}]: "
 	while : ; do
 		echo -n "$_prompt"
 		read _input
