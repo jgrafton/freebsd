@@ -65,11 +65,13 @@ at the command line to add one user at a time, or it may be directed
 to get the list of new users from a file and operate in batch mode
 without requiring any user interaction.
 .Sh ZFS ENCRYPTION
-If ZFS encryption is enabled on the user's home dataset, zfs load-keys
-must be run before mounting the dataset.  This is not handled by FreeBSD
-by default.  It can be run by hand as another user on the system or setup
-to load with the pluggable authentication module, pam_zfs_key.  Enable
-pam_zfs_key by ucommenting the pam_zfs_key lines from /etc/pam.d/system.
+If ZFS encryption is enabled on the user's home dataset, zfs load-key
+must be run against it before mounting.  It can either be run manually 
+after login or setup to run at login with the pam_zfs_key.so
+pluggable authentication module.
+
+To enable zfs load-key at login, uncomment lines using pam_zfs_key.so in 
+the /etc/pam.d/system file.
 .Sh RESTRICTIONS
 .Bl -tag -width indent
 .It username

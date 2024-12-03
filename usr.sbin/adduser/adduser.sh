@@ -699,7 +699,7 @@ create_zfs_dataset() {
 #   Give new user ownership of newly created zfs dataset.
 #
 set_zfs_perms() {
-	if ! ${ZFSCMD} allow "${username}" create,destroy,mount,snapshot "${zhome}"; then
+	if ! ${ZFSCMD} allow "${username}" create,destroy,mount,snapshot,load-key,change-key "${zhome}"; then
 		err "There was an error setting permissions on ZFS dataset (${zhome})."
 		return 1
 	fi
