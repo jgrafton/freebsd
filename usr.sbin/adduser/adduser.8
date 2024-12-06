@@ -66,13 +66,18 @@ to get the list of new users from a file and operate in batch mode
 without requiring any user interaction.
 .Sh ZFS ENCRYPTION
 If ZFS encryption is enabled on the users home dataset, zfs-load-key(8)
-must be run against it before mounting.  It can either be run manually
-after login or setup to run at login with the pam_zfs_key.so openpam(3) library.
+must be run against it before mounting.
+It can either be run manually after login or setup to run at
+login with the pam_zfs_key.so openpam(3) library.
 
-To execute zfs load-key at login, uncomment lines that mention pam_zfs_key.so in
-the /etc/pam.d/system file.  Note that passwd will not update the zfs encryption
-key and require an update with zfs-change-key(8) for auto mounting at login
-to continue to work.  Also, logins via SSH will not auto mount.
+To configure zfs-load-key(8) to run at login,
+uncomment lines that mention pam_zfs_key.so in the /etc/pam.d/system file.
+Note that changing the user password with passwd(1) does not update the 
+zfs encryption key.
+Use zfs-change-key(8) to set the encryption key.
+For auto mounting an encrypted dataset at login to work with pam_zfs_key.so,
+the encryption key and user password must be identical.
+Logins via SSH will not auto mount.
 .Sh RESTRICTIONS
 .Bl -tag -width indent
 .It username
