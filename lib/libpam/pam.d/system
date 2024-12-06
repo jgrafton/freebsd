@@ -6,7 +6,7 @@
 # auth
 #auth		sufficient	pam_krb5.so		no_warn try_first_pass
 #auth		sufficient	pam_ssh.so		no_warn try_first_pass
-#auth		sufficient	pam_zfs_key.so		homes=zroot/home
+#auth		optional	pam_zfs_key.so		homes=zroot/home
 auth		required	pam_unix.so		no_warn try_first_pass nullok
 
 # account
@@ -22,5 +22,5 @@ session         required        pam_xdg.so
 
 # password
 #password	sufficient	pam_krb5.so		no_warn try_first_pass
-#password	sufficient	pam_zfs_key.so		homes=zroot/home
+#password	optional	pam_zfs_key.so		homes=zroot/home
 password	required	pam_unix.so		no_warn try_first_pass
