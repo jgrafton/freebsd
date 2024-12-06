@@ -65,13 +65,14 @@ at the command line to add one user at a time, or it may be directed
 to get the list of new users from a file and operate in batch mode
 without requiring any user interaction.
 .Sh ZFS ENCRYPTION
-If ZFS encryption is enabled on the user's home dataset, zfs load-key
-must be run against it before mounting.  It can either be run manually 
-after login or setup to run at login with the pam_zfs_key.so
-pluggable authentication module.
+If ZFS encryption is enabled on the users home dataset, zfs-load-key(8)
+must be run against it before mounting.  It can either be run manually
+after login or setup to run at login with the pam_zfs_key.so openpam(3) library.
 
-To enable zfs load-key at login, uncomment lines using pam_zfs_key.so in 
-the /etc/pam.d/system file.
+To execute zfs load-key at login, uncomment lines that mention pam_zfs_key.so in
+the /etc/pam.d/system file.  Note that passwd will not update the zfs encryption
+key and require an update with zfs-change-key(8) for auto mounting at login
+to continue to work.  Also, logins via SSH will not auto mount.
 .Sh RESTRICTIONS
 .Bl -tag -width indent
 .It username
