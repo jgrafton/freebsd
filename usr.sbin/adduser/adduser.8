@@ -156,7 +156,8 @@ module.
 To configure
 .Xr zfs-load-key 8
 to run at login,
-uncomment lines that mention pam_zfs_key.so in the /etc/pam.d/system file.
+uncomment lines that mention pam_zfs_key.so in the /etc/pam.d/login and
+/etc/pam.d/passwd files.
 Note that changing the user password with
 .Xr passwd 1
 does not update the zfs encryption key.

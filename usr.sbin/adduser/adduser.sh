@@ -257,7 +257,8 @@ add_user() {
 	# create ZFS dataset before home directory is created with pw
 	if [ "${Zcreate}" = "yes" ]; then
 		if [ "${Zencrypt}" = "yes" ]; then
-			echo "Enter encryption keyphrase for ZFS dataset (Must be identical to password for auto mounting at login) (${zhome}):"
+			echo "Enter encryption keyphrase for ZFS dataset"
+			echo "(Must be identical to password for auto mount at login) (${zhome}):"
 		fi
 		if [ -n "$BSDINSTALL_CHROOT" ]; then
 			create_zfs_chrooted_dataset
