@@ -56,7 +56,7 @@ f_include $BSDCFG_SHARE/variable.subr
 #
 # Default ZFS pool compatibility to use when creating zroot pool
 #
-: ${ZFSBOOT_POOL_COMATIBILITY:=}
+: ${ZFSBOOT_POOL_COMPATIBILITY:=off}
 
 #
 # Default name for the boot environment parent dataset
@@ -332,7 +332,7 @@ msg_please_enter_options_for_your_pool="Please enter options for your pool"
 msg_zfs_options_name="ZFS Pool Options"
 msg_zfs_options_name_help="Customize ZFS options for the pool to be created"
 msg_zfs_compatibility="ZFS Compatibility"
-msg_zfs_compatibility_help="Select template for ZFS pool compatibility"
+msg_zfs_compatibility_help="Select template for ZFS pool compatibility (off enables all features)"
 
 ############################################################ FUNCTIONS
 
@@ -385,7 +385,7 @@ dialog_menu_main()
 		                        '$msg_swap_encrypt_help'
 		'O $msg_zfs_options_name'   '$ZFSBOOT_POOL_CREATE_OPTIONS'
 		                        '$msg_zfs_options_name_help'
-		'C $msg_zfs_compatibility'   '$ZFSBOOT_POOL_COMATIBILITY'
+		'C $msg_zfs_compatibility'   '$ZFSBOOT_POOL_COMPATIBILITY'
 		                        '$msg_zfs_compatibility_help'
 	" # END-QUOTE
 	local defaultitem= # Calculated below
@@ -1243,6 +1243,7 @@ zfs_create_boot()
 		[ $nvdevs -gt 1 ] && bootpool_vdevtype=mirror
 
 		create_options="$ZFSBOOT_BOOT_POOL_CREATE_OPTIONS"
+		create_options="$create_options -o compatibility=$ZFSBOOT_COMPATIBILITY"
 		bootpool_options="-o altroot=$BSDINSTALL_CHROOT"
 		bootpool_options="$bootpool_options $create_options"
 		bootpool_options="$bootpool_options -m \"/$bootpool_name\" -f"
@@ -1355,6 +1356,7 @@ zfs_create_boot()
 	#
 	f_dprintf "$funcname: Creating root pool..."
 	create_options="$ZFSBOOT_POOL_CREATE_OPTIONS"
+	create_options="$create_options -o compatibility=$ZFSBOOT_COMPATIBILITY"
 	if [ "$zroot_vdevtype" == "raid10" ]; then
 		raid10_vdevs=""
 		for vdev in $zroot_vdevs; do
@@ -1632,31 +1634,32 @@ dialog_zfs_compatibility()
 	local hline=
 
 	zfs_compat_list="
-	$(ls /usr/share/zfs/compatibility.d/ 2>/dev/null | \
-		sed -e "s|/usr/share/zfs/compatibility.d/||" | \
-		sort -u )
+	$(echo off off && \
+	  echo legacy legacy && \
+	  find -s /etc/zfs/compatibility.d/ /usr/share/zfs/compatibility.d/ \
+	       -type f \
+		   -exec sh -c 'basename {}; basename {}' \; 2>/dev/null)
 	"
 
-	local vheight vwidth vrows
-	eval f_dialog_menu_with_help_size vheight vwidth vrows \
-		\"\$title\" \"\$btitle\" \"\$vdev_prompt\" \"\$vdev_hline\" \
+	local height width rows
+	eval f_dialog_menu_with_help_size height width rows \
+		\"\$title\" \"\$btitle\" \"\$prompt\" \"\$hline\" \
 		$zfs_compat_list
 
 	local menu_choice
 	menu_choice=$($DIALOG \
 		--title "$title"              \
 		--backtitle "$btitle"         \
-		--hline "$vdev_hline"         \
+		--hline "$hline"              \
 		--ok-label "$msg_ok"          \
+		--no-tags				      \
 		--cancel-label "$msg_cancel"  \
-		--default-item "$ZFSBOOT_VDEV_TYPE" \
-		--no-tags				\
-		--menu "$vdev_prompt"         \
-		$vheight $vwidth $vrows         \
-		$zfs_compat_list 				\
+		--menu "$prompt"              \
+		$height $width $rows          \
+		$zfs_compat_list 			  \
 		2>&1 >&$DIALOG_TERMINAL_PASSTHRU_FD)
 
-	ZFSBOOT_POOL_COMATIBILITY=$menu_choice
+	ZFSBOOT_POOL_COMPATIBILITY=$menu_choice
 }
 
 ############################################################ MAIN
@@ -1909,6 +1912,7 @@ while :; do
 		;;
 	?" $msg_zfs_compatibility")
 		# Dialog prompt for ZFS compatibility template from /usr/share/zfs/compatibility.d/
+		# and /etc/zfs/compatibility.d/
 		dialog_zfs_compatibility
 		;;
 	esac
