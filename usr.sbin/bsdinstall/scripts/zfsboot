@@ -1243,7 +1243,7 @@ zfs_create_boot()
 		[ $nvdevs -gt 1 ] && bootpool_vdevtype=mirror
 
 		create_options="$ZFSBOOT_BOOT_POOL_CREATE_OPTIONS"
-		create_options="$create_options -o compatibility=$ZFSBOOT_COMPATIBILITY"
+		create_options="$create_options -o compatibility=$ZFSBOOT_POOL_COMPATIBILITY"
 		bootpool_options="-o altroot=$BSDINSTALL_CHROOT"
 		bootpool_options="$bootpool_options $create_options"
 		bootpool_options="$bootpool_options -m \"/$bootpool_name\" -f"
@@ -1356,7 +1356,7 @@ zfs_create_boot()
 	#
 	f_dprintf "$funcname: Creating root pool..."
 	create_options="$ZFSBOOT_POOL_CREATE_OPTIONS"
-	create_options="$create_options -o compatibility=$ZFSBOOT_COMPATIBILITY"
+	create_options="$create_options -o compatibility=$ZFSBOOT_POOL_COMPATIBILITY"
 	if [ "$zroot_vdevtype" == "raid10" ]; then
 		raid10_vdevs=""
 		for vdev in $zroot_vdevs; do
@@ -1635,7 +1635,6 @@ dialog_zfs_compatibility()
 
 	zfs_compat_list="
 	$(echo off off && \
-	  echo legacy legacy && \
 	  find -s /etc/zfs/compatibility.d/ /usr/share/zfs/compatibility.d/ \
 	       -type f \
 		   -exec sh -c 'basename {}; basename {}' \; 2>/dev/null)
