@@ -257,7 +257,8 @@ add_user() {
 	# create ZFS dataset before home directory is created with pw
 	if [ "${Zcreate}" = "yes" ]; then
 		if [ "${Zencrypt}" = "yes" ]; then
-			echo "Enter encryption keyphrase for ZFS dataset (${zhome}):"
+			echo "Enter ZFS encryption keyphrase"
+			echo "(if auto-mount is required, then this key must match the password for the user) (${zhome}):"
 		fi
 		if [ -n "$BSDINSTALL_CHROOT" ]; then
 			create_zfs_chrooted_dataset
@@ -635,7 +636,7 @@ get_password() {
 #
 get_zfs_encryption() {
 	local _input= _prompt=
-	_prompt="Enable ZFS encryption? (yes/no) [${Zencrypt}]: "
+	_prompt="Enable ZFS encryption? (To auto-mount at login, see adduser(8).) (yes/no) [${Zencrypt}]: "
 	while : ; do
 		echo -n "$_prompt"
 		read _input
@@ -699,7 +700,7 @@ create_zfs_dataset() {
 #   Give new user ownership of newly created zfs dataset.
 #
 set_zfs_perms() {
-	if ! ${ZFSCMD} allow "${username}" create,destroy,mount,snapshot "${zhome}"; then
+	if ! ${ZFSCMD} allow "${username}" create,destroy,mount,snapshot,load-key,change-key "${zhome}"; then
 		err "There was an error setting permissions on ZFS dataset (${zhome})."
 		return 1
 	fi

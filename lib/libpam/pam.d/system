@@ -4,6 +4,7 @@
 #
 
 # auth
+#auth		optional	pam_zfs_key.so  homes=zroot/home
 #auth		sufficient	pam_krb5.so		no_warn try_first_pass
 #auth		sufficient	pam_ssh.so		no_warn try_first_pass
 auth		required	pam_unix.so		no_warn try_first_pass nullok
@@ -14,6 +15,7 @@ account		required	pam_login_access.so
 account		required	pam_unix.so
 
 # session
+#session    optional	pam_zfs_key.so  homes=zroot/home
 #session	optional	pam_ssh.so		want_agent
 session		required	pam_lastlog.so		no_fail
 session         required        pam_xdg.so
